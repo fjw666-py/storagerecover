@@ -266,22 +266,44 @@ public class TransactionManager {
 			}
 		}
 		//设置end标志
+// 		for(Long txn:alreadyPersist){
+// 			com.remove(txn);
+// 			Record comm = new Record(txn,(byte)4);
+// 			byte[] commit = comm.serialize();
+// 			logManager.appendLogRecord(commit);
+// 		}
+// 		//设置截断策略
+// 		boolean flag = true;
+// 		for(Map.Entry<Long ,Integer> entry : startPos.entrySet()){
+// 			if(entry.getValue() <= persisted_tag){
+// 				flag = false;
+// 				break;
+// 			}
+// 		}
+// 		if(flag){
+// 			logManager.setLogTruncationOffset((int)persisted_tag);
+// 		}
+		
+		Integer truncate = 0;
 		for(Long txn:alreadyPersist){
 			com.remove(txn);
 			Record comm = new Record(txn,(byte)4);
 			byte[] commit = comm.serialize();
-			logManager.appendLogRecord(commit);
+			truncate = logManager.appendLogRecord(commit);
 		}
+
 		//设置截断策略
-		boolean flag = true;
-		for(Map.Entry<Long ,Integer> entry : startPos.entrySet()){
-			if(entry.getValue() <= persisted_tag){
-				flag = false;
-				break;
+		if(alreadyPersist.size()!=0) {
+			boolean flag = true;
+			for (Map.Entry<Long, Integer> entry : startPos.entrySet()) {
+				if (entry.getValue() <= truncate) {
+					flag = false;
+					break;
+				}
 			}
-		}
-		if(flag){
-			logManager.setLogTruncationOffset((int)persisted_tag);
+			if (flag) {
+				logManager.setLogTruncationOffset((int) truncate);
+			}
 		}
 	}
 }
