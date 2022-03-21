@@ -8,7 +8,6 @@ import cs245.as3.interfaces.LogManager;
 import cs245.as3.interfaces.StorageManager;
 import cs245.as3.interfaces.StorageManager.TaggedValue;
 
-import javax.swing.text.html.HTML;
 
 /**
  * You will implement this class.
@@ -54,7 +53,7 @@ public class TransactionManager {
 	 * 从截止位置开始，提交了但是没有结束的事务集合
 	 */
 	private HashSet<Long> com;
-//	private Deque<Commit> com;
+
 	/**
 	 * 从截止位置开始的，没有结束的事务集合的开始位置
 	 */
@@ -109,7 +108,7 @@ public class TransactionManager {
 			byte state = byteBuffer.get();
 			Long cur_key = byteBuffer.getLong();
 			byte lengthOfValue = byteBuffer.get();
-			byte length = 0;
+			byte length;
 			if(state == 2) {
 				byte[] value = logManager.readLogRecord(lastTruncate + Long.BYTES * 2 + Byte.BYTES * 2, lengthOfValue);
 				//如果不包括的话，一定是上一个truncate之前已经end的事务剩下的事务。不需要在txKeyMap中添加
@@ -131,12 +130,8 @@ public class TransactionManager {
 					}
 				}
 				if(state==4){
-					if(startPos.containsKey(txid)){
-						startPos.remove(txid);
-					}
-					if(txKeyTag.containsKey(txid)){
-						txKeyTag.remove(txid);
-					}
+					startPos.remove(txid);
+					txKeyTag.remove(txid);
 					com.remove(txid);
 				}
 				length =(byte)(Long.BYTES*2 + Byte.BYTES*2);
@@ -253,6 +248,7 @@ public class TransactionManager {
 //	*这些调用是按写入密钥的顺序进行的，除非发生崩溃，否则每一次这样的排队写入都会发生一次。
 	public void writePersisted(long key, long persisted_tag, byte[] persisted_value) {
 		HashSet<Long> alreadyPersist = new HashSet<>();
+
 		for(Long txn: com){
 			if(txKeyTag.containsKey(txn)){
 				if(txKeyTag.get(txn).containsKey(key)
@@ -265,28 +261,13 @@ public class TransactionManager {
 				startPos.remove(txn);
 			}
 		}
-		//设置end标志
-// 		for(Long txn:alreadyPersist){
-// 			com.remove(txn);
-// 			Record comm = new Record(txn,(byte)4);
-// 			byte[] commit = comm.serialize();
-// 			logManager.appendLogRecord(commit);
-// 		}
-// 		//设置截断策略
-// 		boolean flag = true;
-// 		for(Map.Entry<Long ,Integer> entry : startPos.entrySet()){
-// 			if(entry.getValue() <= persisted_tag){
-// 				flag = false;
-// 				break;
-// 			}
-// 		}
-// 		if(flag){
-// 			logManager.setLogTruncationOffset((int)persisted_tag);
-// 		}
-		
+
+		/////////////////////
+
 		Integer truncate = 0;
 		for(Long txn:alreadyPersist){
 			com.remove(txn);
+			txKeyTag.remove(txn);
 			Record comm = new Record(txn,(byte)4);
 			byte[] commit = comm.serialize();
 			truncate = logManager.appendLogRecord(commit);
@@ -302,7 +283,7 @@ public class TransactionManager {
 				}
 			}
 			if (flag) {
-				logManager.setLogTruncationOffset((int) truncate);
+				logManager.setLogTruncationOffset(truncate);
 			}
 		}
 	}
